@@ -133,6 +133,7 @@ dmypy.json
 *.fli
 *.flc
 *.pcx
+*.png
 *.a
 *.b
 *.c

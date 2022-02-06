@@ -46,9 +46,9 @@ def read_file_entry(entry: bytes):
 
 
 def extract_all(stream: IO[bytes]) -> None:
-    _header, header_size, fat_offset = read_file_header(f)
+    _header, header_size, fat_offset = read_file_header(stream)
     stream.seek(fat_offset, io.SEEK_SET)
-    files = [read_file_entry(entry) for entry in read_file_table(f)]
+    files = [read_file_entry(entry) for entry in read_file_table(stream)]
 
     stream.seek(header_size, io.SEEK_SET)
     for offset, size, unk1, unk2, fname, fdir in files:
@@ -57,12 +57,10 @@ def extract_all(stream: IO[bytes]) -> None:
             stream.seek(offset, io.SEEK_SET)
             exit(1)
         print(offset, size, unk1, unk2, fname, fdir)
-        
+
         fdir = pathlib.Path(fdir.replace(':', '_'))
         assert fdir.relative_to('.'), fdir
-        os.makedirs(fdir, exist_ok=True)
-        with open(fdir / fname, 'wb') as out:
-            out.write(stream.read(size))
+        yield offset, unk1, unk2, fname, fdir, stream.read(size)
 
     assert stream.tell() == fat_offset, (stream.tell(), fat_offset)
     return files
@@ -74,6 +72,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    with open(args.fname, 'rb') as f:
-        files = extract_all(f)
-        print('Extracted {num} files'.format(num=len(files)))
+    with open(args.fname, 'rb') as data_file:
+        num_files = 0
+        for offset, unk1, unk2, fname, fdir, content in extract_all(data_file):
+            os.makedirs(fdir, exist_ok=True)
+            with open(fdir / fname, 'wb') as out:
+                out.write(content)
+            num_files += 1
+        print('Extracted {num} files'.format(num=num_files))
